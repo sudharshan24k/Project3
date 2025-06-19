@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray } from '@angular/forms';
 import { CookieService } from 'ngx-cookie-service';
 import { ConfigurationRequest, ConfigurationResponse, TemplateInfo, FormData } from '../../models/config.model';
 import { ApiService } from '../../services/api.service';
@@ -12,171 +12,135 @@ import { FormCookieService } from '../../services/cookie.service';
   imports: [CommonModule, FormsModule, ReactiveFormsModule],
   template: `
     <div class="container">
-      <div class="card">
+      <div class="card mt-4">
         <div class="card-header">
           <h2>Configuration File Generator</h2>
         </div>
         <div class="card-body">
-          <form [formGroup]="configForm" (ngSubmit)="onSubmit()">
-            <div class="row">
+          <form [formGroup]="configForm" (ngSubmit)="onPreview()">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label">App Name *</label>
+                <input type="text" class="form-control" formControlName="appName" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Version *</label>
+                <input type="text" class="form-control" formControlName="version" required>
+              </div>
+            </div>
+            <div class="row mb-3">
               <div class="col-md-6">
                 <label class="form-label">Environment *</label>
-                <select class="form-select" formControlName="environment" (change)="onEnvironmentChange()">
-                  <option value="">Select Environment</option>
-                  <option *ngFor="let env of environments" [value]="env">{{ env }}</option>
-                </select>
+                <input type="text" class="form-control" formControlName="environment" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label">File Name *</label>
-                <input type="text" class="form-control" formControlName="filename">
+                <label class="form-label">Owner *</label>
+                <input type="text" class="form-control" formControlName="owner" required>
               </div>
             </div>
-            
-            <div *ngIf="templateInfo && templateInfo.parameters.length > 0">
-              <h5>Parameters</h5>
-              <div *ngFor="let param of templateInfo.parameters">
-                <label>{{ param.key }}</label>
-                <input type="text" class="form-control" [formControlName]="'param_' + param.key">
+            <div class="row mb-3">
+              <div class="col-12">
+                <label class="form-label">Description *</label>
+                <input type="text" class="form-control" formControlName="description" required>
               </div>
             </div>
-            
-            <button type="submit" class="btn btn-primary" [disabled]="configForm.invalid || isLoading">
-              Generate Configuration
-            </button>
+
+            <div class="row mb-3">
+              <div class="col-12">
+                <label class="form-label">Additional Parameters</label>
+                <div formArrayName="parameters">
+                  <div *ngFor="let param of parameters.controls; let i = index" [formGroupName]="i" class="row mb-2 align-items-center">
+                    <div class="col-md-5">
+                      <input type="text" class="form-control" formControlName="key" placeholder="Key">
+                    </div>
+                    <div class="col-md-5">
+                      <input type="text" class="form-control" formControlName="value" placeholder="Value">
+                    </div>
+                    <div class="col-md-2">
+                      <button type="button" class="btn btn-danger" (click)="removeParameter(i)">Remove</button>
+                    </div>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-secondary mt-2" (click)="addParameter()">Add Parameter</button>
+              </div>
+            </div>
+
+            <div class="row mt-4">
+              <div class="col-12 text-end">
+                <button type="submit" class="btn btn-success" [disabled]="configForm.invalid">Preview Config</button>
+              </div>
+            </div>
           </form>
         </div>
       </div>
-      
-      <div *ngIf="generatedConfig" class="alert alert-success">
-        Configuration generated successfully! File: {{ generatedConfig.file_path }}
+
+      <div *ngIf="previewContent" class="card mt-4">
+        <div class="card-header bg-info text-white">
+          <h5>Preview Configuration</h5>
+        </div>
+        <div class="card-body">
+          <pre style="background:#f8f9fa; padding:1em; border-radius:8px;">{{ previewContent }}</pre>
+          <button class="btn btn-primary mt-2" (click)="onDownload()">Download Config</button>
+        </div>
+      </div>
+
+      <div *ngIf="downloadUrl" class="alert alert-success mt-4">
+        Config generated! <a [href]="downloadUrl" download="config.conf">Click here to download your config file</a>
       </div>
     </div>
   `
 })
 export class ConfigGeneratorComponent implements OnInit {
   configForm: FormGroup;
-  environments: string[] = [];
-  templateInfo: TemplateInfo | null = null;
-  isLoading = false;
-  generatedConfig: ConfigurationResponse | null = null;
+  previewContent: string | null = null;
+  downloadUrl: string | null = null;
 
-  constructor(
-    private fb: FormBuilder,
-    private apiService: ApiService,
-    private cookieService: FormCookieService,
-    private ngxCookieService: CookieService
-  ) {
+  constructor(private fb: FormBuilder) {
     this.configForm = this.fb.group({
+      appName: ['', Validators.required],
+      version: ['', Validators.required],
       environment: ['', Validators.required],
-      filename: ['', Validators.required],
-      templateType: ['application']
+      owner: ['', Validators.required],
+      description: ['', Validators.required],
+      parameters: this.fb.array([])
     });
   }
 
-  ngOnInit(): void {
-    this.loadEnvironments();
-    this.loadSavedFormData();
+  ngOnInit(): void {}
+
+  get parameters(): FormArray {
+    return this.configForm.get('parameters') as FormArray;
   }
 
-  private loadEnvironments(): void {
-    this.apiService.getEnvironments().subscribe({
-      next: (environments) => this.environments = environments,
-      error: (error) => console.error('Failed to load environments:', error)
-    });
+  addParameter(): void {
+    this.parameters.push(this.fb.group({ key: '', value: '' }));
   }
 
-  private loadSavedFormData(): void {
-    const savedData = this.cookieService.loadFormData();
-    if (savedData) {
-      this.configForm.patchValue({
-        environment: savedData.environment || '',
-        filename: savedData.filename || '',
-        templateType: savedData.templateType || 'application'
-      });
-      if (savedData.environment) {
-        this.loadTemplateInfo(savedData.environment, savedData.templateType || 'application');
-      }
-    }
+  removeParameter(index: number): void {
+    this.parameters.removeAt(index);
   }
 
-  onEnvironmentChange(): void {
-    const environment = this.configForm.get('environment')?.value;
-    if (environment) {
-      this.loadTemplateInfo(environment, 'application');
-    }
-    this.saveFormData();
-  }
-
-  private loadTemplateInfo(environment: string, templateType: string): void {
-    this.isLoading = true;
-    this.apiService.getTemplateInfo(environment, templateType).subscribe({
-      next: (templateInfo) => {
-        this.templateInfo = templateInfo;
-        this.setupParameterControls();
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('Failed to load template info:', error);
-        this.isLoading = false;
-      }
-    });
-  }
-
-  private setupParameterControls(): void {
-    if (!this.templateInfo) return;
-    this.templateInfo.parameters.forEach(param => {
-      const controlName = 'param_' + param.key;
-      if (this.configForm.contains(controlName)) {
-        this.configForm.removeControl(controlName);
-      }
-      this.configForm.addControl(controlName, this.fb.control(''));
-    });
-  }
-
-  private getParametersFromForm(): { [key: string]: any } {
-    const parameters: { [key: string]: any } = {};
-    if (this.templateInfo) {
-      this.templateInfo.parameters.forEach(param => {
-        const control = this.configForm.get('param_' + param.key);
-        if (control) {
-          parameters[param.key] = control.value;
-        }
-      });
-    }
-    return parameters;
-  }
-
-  onSubmit(): void {
+  onPreview(): void {
     if (this.configForm.invalid) return;
-
-    const request: ConfigurationRequest = {
-      environment: this.configForm.get('environment')?.value,
-      filename: this.configForm.get('filename')?.value,
-      templateType: this.configForm.get('templateType')?.value,
-      parameters: this.getParametersFromForm()
-    };
-
-    this.isLoading = true;
-    this.apiService.generateConfiguration(request).subscribe({
-      next: (response) => {
-        this.generatedConfig = response;
-        this.isLoading = false;
-        this.cookieService.clearFormData();
-      },
-      error: (error) => {
-        console.error('Failed to generate configuration:', error);
-        this.isLoading = false;
+    const formValue = this.configForm.value;
+    let configContent = '';
+    configContent += `app_name = ${formValue.appName}\n`;
+    configContent += `version = ${formValue.version}\n`;
+    configContent += `environment = ${formValue.environment}\n`;
+    configContent += `owner = ${formValue.owner}\n`;
+    configContent += `description = ${formValue.description}\n`;
+    formValue.parameters.forEach((param: any) => {
+      if (param.key && param.value) {
+        configContent += `${param.key} = ${param.value}\n`;
       }
     });
+    this.previewContent = configContent;
+    this.downloadUrl = null;
   }
 
-  private saveFormData(): void {
-    const formData: FormData = {
-      environment: this.configForm.get('environment')?.value || '',
-      filename: this.configForm.get('filename')?.value || '',
-      templateType: this.configForm.get('templateType')?.value || 'application',
-      parameters: this.getParametersFromForm()
-    };
-    this.cookieService.saveFormData(formData);
+  onDownload(): void {
+    if (!this.previewContent) return;
+    const blob = new Blob([this.previewContent], { type: 'text/plain' });
+    this.downloadUrl = window.URL.createObjectURL(blob);
   }
 } 

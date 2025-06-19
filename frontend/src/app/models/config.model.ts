@@ -57,4 +57,5 @@ export interface FormData {
   filename: string;
   parameters: { [key: string]: any };
   template_type: string;
+  [key: string]: any;
 } 

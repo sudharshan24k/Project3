@@ -49,7 +49,7 @@ export class FormCookieService {
   // Save individual form field
   saveFormField(fieldName: string, value: any): void {
     try {
-      const currentData = this.loadFormData() || {};
+      const currentData = this.loadFormData() || {} as FormData;
       currentData[fieldName] = value;
       this.saveFormData(currentData);
     } catch (error) {
