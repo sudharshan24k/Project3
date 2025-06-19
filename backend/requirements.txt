@@ -1,7 +1,6 @@
 fastapi
 uvicorn[standard]
 pydantic
-pymongo
 jinja2
 python-multipart
 python-dotenv

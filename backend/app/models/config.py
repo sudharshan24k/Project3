@@ -29,16 +29,6 @@ class ConfigurationResponse(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     status: str = Field(default="success", description="Generation status")
 
-class ConfigurationHistory(BaseModel):
-    id: str = Field(..., description="Configuration ID")
-    environment: Environment = Field(..., description="Target environment")
-    filename: str = Field(..., description="Configuration file name")
-    file_path: str = Field(..., description="Generated file path")
-    parameters: Dict[str, Any] = Field(..., description="Configuration parameters")
-    template_type: str = Field(..., description="Template type used")
-    created_at: datetime = Field(..., description="Creation timestamp")
-    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
-
 class TemplateInfo(BaseModel):
     environment: Environment = Field(..., description="Environment")
     template_type: str = Field(..., description="Template type")

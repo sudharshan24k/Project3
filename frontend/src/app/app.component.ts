@@ -23,12 +23,6 @@ import { CommonModule } from '@angular/common';
           <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
               <li class="nav-item">
-                <a class="nav-link" routerLink="/generator" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
-                  <i class="fas fa-plus-circle me-1"></i>
-                  Generate Config
-                </a>
-              </li>
-              <li class="nav-item">
                 <a class="nav-link" routerLink="/history" routerLinkActive="active">
                   <i class="fas fa-history me-1"></i>
                   History
